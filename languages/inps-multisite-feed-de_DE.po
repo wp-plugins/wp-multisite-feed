@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: Inpsyde Multisite Feed v1.0.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2013-06-19 15:49:34+0000\n"
+"PO-Revision-Date: 2013-06-19 16:10:29+0000\n"
 "Last-Translator: admin <ericteubert@googlemail.com>\n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -94,4 +94,9 @@ msgstr "Aktuell werden podPress und Blubrry PowerPress als Plugin unterstützt."
 #@ inps-multisite-feed
 msgid "Set to 0 for deactivate caching."
 msgstr "Setze den Wert auf 0 um den Cache zu deaktivieren."
+
+#: inc/class-settings-page.php:114
+#@ inps-multisite-feed
+msgid "Language key for the feed. Use the keys from the <a href=\"http://www.loc.gov/standards/iso639-2/php/code_list.php\">ISO-639 language key</a>, not the same as the WPLANG constant."
+msgstr "Sprachschlüssel für den Feed. Nutze Schlüssel von <a href=\\\"http://www.loc.gov/standards/iso639-2/php/code_list.php\\\">ISO-639 language key</a>, nicht den gleichen Schlüssel wie in der WPLANG Konstante."
 
