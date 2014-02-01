@@ -93,6 +93,7 @@ function display_feed() {
 		$max_entries          = Settings\get_site_option( 'max_entries' );
 		$excluded_blogs       = Settings\get_site_option( 'excluded_blogs' );
 		$only_podcasts        = Settings\get_site_option( 'only_podcasts' );
+		$use_excerpt          = Settings\get_site_option( 'use_excerpt' );
 		
 		if ( $excluded_blogs )
 			$excluded_blogs_sql = "AND blog.`blog_id` NOT IN (" . $excluded_blogs . ")";
@@ -103,7 +104,7 @@ function display_feed() {
 			SELECT
 				blog.`blog_id`
 			FROM
-				".$wpdb->base_prefix."blogs AS blog 
+				" . $wpdb->base_prefix . "blogs AS blog 
 			WHERE
 				blog.`public` = '1'
 				AND blog.`archived` = '0'
@@ -121,7 +122,7 @@ function display_feed() {
 		foreach( $blogs as $blog_id ) {
 			
 			if ( $only_podcasts ) {
-				$only_podcasts_sql_from  = ", `" . $wpdb->base_prefix . ($blog_id > 1 ? $blog_id . '_' : '') . "postmeta` AS postmeta";
+				$only_podcasts_sql_from  = ", `" . $wpdb->get_blog_prefix( $blog_id ) . "postmeta` AS postmeta";
 				$only_podcasts_sql_where = "AND posts.`ID` = postmeta.`post_id`";
 				$only_podcasts_sql       = "AND (postmeta.`meta_key` = 'enclosure' OR postmeta.`meta_key` = '_podPressMedia')";
 			} else {
@@ -130,11 +131,13 @@ function display_feed() {
 				$only_podcasts_sql = '';
 			}
 			
+			// $wpdb::get_blog_prefix( $blog_id )
+			// $wpdb->base_prefix . ($blog_id > 1 ? $blog_id . '_' : '')
 			$results = $wpdb->get_results( "
 				SELECT
 					posts.`ID`, posts.`post_date_gmt` AS date
 				FROM
-					`" . $wpdb->base_prefix . ($blog_id > 1 ? $blog_id . '_' : '') . "posts` AS posts
+					`" . $wpdb->get_blog_prefix( $blog_id ) . "posts` AS posts
 					$only_podcasts_sql_from
 				WHERE
 					posts.`post_type` = 'post'
@@ -194,6 +197,36 @@ function invalidate_cache() {
 }
 
 /**
+ * Retrieve the post content for feeds with the custom option for full or excerpt text.
+ *
+ * @since  02/01/2014
+ * @param  string $feed_type The type of feed. rss2 | atom | rss | rdf
+ * @return string The filtered content.
+ */
+function get_the_content_feed( $feed_type = NULL ) {
+	
+	if ( ! $feed_type )
+		$feed_type = get_default_feed();
+	
+	global $more;
+	$temp    = $more;
+	$more    = (int) Settings\get_site_option( 'use_excerpt' );
+	/** This filter is documented in wp-admin/post-template.php */
+	$content = apply_filters( 'the_content', get_the_content() );
+	$content = str_replace( ']]>', ']]&gt;', $content );
+	$more    = $temp;
+	
+	/**
+	 * Filter the post content for use in feeds.
+	 * 
+	 * @param string $content   The current post content.
+	 * @param string $feed_type Type of feed. Possible values include 'rss2', 'atom'.
+	 *                          Default 'rss2'.
+	 */
+	return apply_filters( 'the_content_feed', $content, $feed_type );
+}
+
+/**
  * Return XML for full feed.
  * 
  * @param   array $feed_items Array of objects. Required attributes: ID (=post id), blog_id
@@ -220,49 +253,50 @@ echo '<?xml version="1.0" encoding="' . get_option( 'blog_charset' ) . '"?' . '>
 >
 
 <channel>
-		<title><?php echo get_feed_title(); ?></title>
-		<atom:link href="<?php echo get_feed_url(); ?>" rel="self" type="application/rss+xml" />
-		<link><?php echo get_feed_url(); ?></link>
-		<description><?php echo get_feed_description(); ?></description>
-		<lastBuildDate><?php echo mysql2date( 'D, d M Y H:i:s +0000', get_lastpostmodified( 'GMT' ), FALSE ); ?></lastBuildDate>
-		<language><?php echo $rss_language; ?></language>
-		<sy:updatePeriod><?php echo apply_filters( 'rss_update_period', 'hourly' ); ?></sy:updatePeriod>
-		<sy:updateFrequency><?php echo apply_filters( 'rss_update_frequency', '1' ); ?></sy:updateFrequency>
-		<?php do_action( 'rss2_head' ); ?>
+	<title><?php echo get_feed_title(); ?></title>
+	<atom:link href="<?php echo get_feed_url(); ?>" rel="self" type="application/rss+xml" />
+	<link><?php echo get_feed_url(); ?></link>
+	<description><?php echo get_feed_description(); ?></description>
+	<lastBuildDate><?php echo mysql2date( 'D, d M Y H:i:s +0000', get_lastpostmodified( 'GMT' ), FALSE ); ?></lastBuildDate>
+	<language><?php echo $rss_language; ?></language>
+	<sy:updatePeriod><?php echo apply_filters( 'rss_update_period', 'hourly' ); ?></sy:updatePeriod>
+	<sy:updateFrequency><?php echo apply_filters( 'rss_update_frequency', '1' ); ?></sy:updateFrequency>
+	<?php do_action( 'rss2_head' );
+	
+	foreach ( $feed_items as $feed_item ):
+		switch_to_blog( $feed_item->blog_id );
+		$post = get_post( $feed_item->ID );
+		setup_postdata( $post ); ?>
 		
-		<?php foreach ( $feed_items as $feed_item ): ?>
-			<?php switch_to_blog( $feed_item->blog_id ); ?>
-			<?php $post = get_post( $feed_item->ID ); ?>
-			<?php setup_postdata( $post ); ?>
+		<item>
+			<title><?php the_title_rss() ?></title>
+			<link><?php the_permalink_rss() ?></link>
+			<comments><?php comments_link_feed(); ?></comments>
+			<pubDate><?php echo mysql2date( 'D, d M Y H:i:s +0000', get_post_time( 'Y-m-d H:i:s', TRUE ), FALSE ); ?></pubDate>
+			<dc:creator><?php the_author(); ?></dc:creator>
+			<?php the_category_rss( 'rss2' ); ?>
 			
-			<item>
-				<title><?php the_title_rss() ?></title>
-				<link><?php the_permalink_rss() ?></link>
-				<comments><?php comments_link_feed(); ?></comments>
-				<pubDate><?php echo mysql2date( 'D, d M Y H:i:s +0000', get_post_time( 'Y-m-d H:i:s', TRUE ), FALSE ); ?></pubDate>
-				<dc:creator><?php the_author() ?></dc:creator>
-				<?php the_category_rss( 'rss2' ) ?>
-				
-				<guid isPermaLink="false"><?php the_guid(); ?></guid>
-		<?php if ( get_option('rss_use_excerpt') ) : ?>
-				<description><![CDATA[<?php the_excerpt_rss() ?>]]></description>
+			<guid isPermaLink="false"><?php the_guid(); ?></guid>
+	<?php if ( get_option( 'rss_use_excerpt' ) ) : ?>
+			<description><![CDATA[<?php the_excerpt_rss(); ?>]]></description>
+	<?php else : ?>
+			<description><![CDATA[<?php the_excerpt_rss(); ?>]]></description>
+		<?php $content = \Inpsyde\MultisiteFeed\get_the_content_feed( 'rss2' ); ?>
+		<?php if ( strlen( $content ) > 0 ) : ?>
+			<content:encoded><![CDATA[<?php echo $content; ?>]]></content:encoded>
 		<?php else : ?>
-				<description><![CDATA[<?php the_excerpt_rss() ?>]]></description>
-			<?php if ( strlen( $post->post_content ) > 0 ) : ?>
-				<content:encoded><![CDATA[<?php the_content_feed('rss2') ?>]]></content:encoded>
-			<?php else : ?>
-				<content:encoded><![CDATA[<?php the_excerpt_rss() ?>]]></content:encoded>
-			<?php endif; ?>
+			<content:encoded><![CDATA[<?php the_excerpt_rss() ?>]]></content:encoded>
 		<?php endif; ?>
-				<wfw:commentRss><?php echo esc_url( get_post_comments_feed_link( NULL, 'rss2' ) ); ?></wfw:commentRss>
-				<slash:comments><?php echo get_comments_number(); ?></slash:comments>
-		<?php rss_enclosure(); ?>
-			<?php do_action( 'rss2_item' ); ?>
-			</item>
-			
-			<?php restore_current_blog(); ?>
-		<?php endforeach ?>
+	<?php endif; ?>
+			<wfw:commentRss><?php echo esc_url( get_post_comments_feed_link( NULL, 'rss2' ) ); ?></wfw:commentRss>
+			<slash:comments><?php echo get_comments_number(); ?></slash:comments>
+	<?php rss_enclosure();
+		do_action( 'rss2_item' ); ?>
+		</item>
 		
+		<?php restore_current_blog();
+	endforeach ?>
+	
 </channel>
 </rss>
 <?php
@@ -272,6 +306,9 @@ echo '<?xml version="1.0" encoding="' . get_option( 'blog_charset' ) . '"?' . '>
 	
 	return $xml;
 }
+
+// set new filter to feed content
+add_filter( 'pre_option_rss_use_excerpt', '__return_zero' );
 
 // invalidate cache when necessary
 add_action( 'init', function () {
@@ -304,19 +341,3 @@ add_action( 'init', function () {
 		exit;
 	}
 } );
-
-/**
- * Simple helper to debug to the console
- * 
- * $data   Array, String $data
- * @return void
- */
-function debug_to_console( $data ) {
-	
-	if ( is_array( $data ) )
-		$output = "<script>console.log( 'Debug Multisite-Feed: " . implode( ',', $data) . "' );</script>";
-	else
-		$output = "<script>console.log( 'Debug Multisite-Feed: " . $data . "' );</script>";
-		
-	echo $output;
-}
