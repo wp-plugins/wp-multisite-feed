@@ -15,9 +15,9 @@ Create a separate feed for your whole multisite. This feed will have a custom ur
 = Bugs, technical hints or contribute =
 Please give me feedback, contribute and file technical bugs on this [GitHub Repo](https://github.com/inpsyde/WP-Multisite-Feed), use Issues.
 
-**Made by [Inpsyde](http://inpsyde.com) &middot; We love WordPress**
+**Crafted by [Inpsyde](http://inpsyde.com) &middot; Engineering the web since 2006.**
 
-Have a look at the premium plugins in our [market](http://marketpress.com).
+Yes, we also run that [marketplace for premium WordPress plugins and themes](http://marketpress.com).
 
 == Installation ==
 = Requirements =
